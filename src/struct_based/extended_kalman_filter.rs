@@ -98,7 +98,7 @@ pub trait NonlinearMeasurementModel<const M: usize, const S: usize, T>: Intermed
     fn measurement_noise(&self) -> Matrix<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>;
 
     fn measurement_jacobian(&self, state: &Vector<T, Const<S>, Owned<T, Const<S>>>,
-                            H: &mut Matrix<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>);
+                            h: &mut Matrix<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>);
 }
 
 pub trait NonlinearUpdateWorkspace<const S: usize, const M: usize, T, ISS: IntermediateStateSize<T>>
@@ -128,9 +128,9 @@ pub struct GenericNonlinearUpdateWorkspace<T: RealField + NumCast + Copy + Defau
     intermediate_state: MM::IntermediateState,
     predicted_measurement: Vector<T, Const<M>, ArrayStorage<T, M, 1>>,
     temp: Matrix<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>,
-    S_: Matrix<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>,
-    K: Matrix<T, Const<S>, Const<M>, ArrayStorage<T, S, M>>,
-    H: Matrix<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>,
+    s_: Matrix<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>,
+    k: Matrix<T, Const<S>, Const<M>, ArrayStorage<T, S, M>>,
+    h: Matrix<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>,
     y: Vector<T, Const<M>, ArrayStorage<T, M, 1>>,
     I: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
     S_inv: Matrix<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>,
@@ -150,9 +150,9 @@ impl<T: RealField + NumCast + Copy + Default, const S: usize, const M: usize, MM
         (&mut self.intermediate_state,
          &mut self.predicted_measurement,
          &mut self.temp,
-         &mut self.S_,
-         &mut self.K,
-         &mut self.H,
+         &mut self.s_,
+         &mut self.k,
+         &mut self.h,
          &mut self.y,
          &mut self.I,
          &mut self.S_inv)
@@ -165,9 +165,9 @@ impl<T: RealField + NumCast + Copy + Default, const S: usize, const M: usize, MM
             intermediate_state: initial_intermediate_state,
             predicted_measurement: Vector::<T, Const<M>, ArrayStorage<T, M, 1>>::zeros(),
             temp: Matrix::<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>::zeros(),
-            S_: Matrix::<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>::zeros(),
-            K: Matrix::<T, Const<S>, Const<M>, ArrayStorage<T, S, M>>::zeros(),
-            H: Matrix::<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>::zeros(),
+            s_: Matrix::<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>::zeros(),
+            k: Matrix::<T, Const<S>, Const<M>, ArrayStorage<T, S, M>>::zeros(),
+            h: Matrix::<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>::zeros(),
             y: Vector::<T, Const<M>, ArrayStorage<T, M, 1>>::zeros(),
             I: Matrix::<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>::identity(),
             S_inv: Matrix::<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>::zeros(),
@@ -193,28 +193,28 @@ pub trait NonlinearUpdate<T, const S: usize, const M: usize, ISS, Workspace>: Ka
         ArrayStorage<T, M, S>: Storage<T, Const<M>, Const<S>>,
         ArrayStorage<T, S, S>: Storage<T, Const<S>, Const<S>>
     {
-        let (intermediate_state, predicted_measurement, temp, S_, K, H, y, I, S_inv) = workspace.workspace_temps();
+        let (intermediate_state, predicted_measurement, temp, s_, k, h, y, I, S_inv) = workspace.workspace_temps();
         let (state, cov) = self.state_cov();
         mapping.to_intermediate(state, intermediate_state);
         measurement_model.h(intermediate_state, predicted_measurement);
 
-        measurement_model.measurement_jacobian(state, H);
-        *temp = *H * *cov;
+        measurement_model.measurement_jacobian(state, h);
+        *temp = *h * *cov;
 
-        *S_ = *temp * H.transpose() + measurement_model.measurement_noise();
+        *s_ = *temp * h.transpose() + measurement_model.measurement_noise();
 
         // Compute the Kalman gain using the previously computed S_
-        *S_inv = S_.try_inverse().expect("Matrix is not invertible!");
-        *K = *cov * H.transpose() * *S_inv;
+        *S_inv = s_.try_inverse().expect("Matrix is not invertible!");
+        *k = *cov * h.transpose() * *S_inv;
 
         // Compute the measurement residual
         *y = z - *predicted_measurement;
 
         // Update the state estimate
-        *state = *state + *K * *y;
+        *state = *state + *k * *y;
 
         // Update the error covariance matrix using workspace matrices
-        *cov = (*I - *K * *H) * *cov;
+        *cov = (*I - *k * *h) * *cov;
     }
 }
 
@@ -276,12 +276,12 @@ mod tests {
             )
         }
 
-        fn measurement_jacobian(&self, _state: &Vector<T, Const<S>, Owned<T, Const<S>>>, H: &mut Matrix<T, Const<2>, Const<S>, ArrayStorage<T, 2, S>>) {
+        fn measurement_jacobian(&self, _state: &Vector<T, Const<S>, Owned<T, Const<S>>>, h: &mut Matrix<T, Const<2>, Const<S>, ArrayStorage<T, 2, S>>) {
             // Fill in the Jacobian matrix `H` according to your measurement model's relation with the state
             // Given the example, assuming that only the first two state variables relate to the measurement model:
-            H.fill(T::zero());
-            H[(0, 0)] = T::one();
-            H[(1, 1)] = T::one();
+            h.fill(T::zero());
+            h[(0, 0)] = T::one();
+            h[(1, 1)] = T::one();
         }
     }
 
@@ -322,12 +322,12 @@ mod tests {
             )
         }
 
-        fn measurement_jacobian(&self, _state: &Vector<T, Const<S>, Owned<T, Const<S>>>, H: &mut Matrix<T, Const<2>, Const<S>, ArrayStorage<T, 2, S>>) {
+        fn measurement_jacobian(&self, _state: &Vector<T, Const<S>, Owned<T, Const<S>>>, h: &mut Matrix<T, Const<2>, Const<S>, ArrayStorage<T, 2, S>>) {
             // Fill in the Jacobian matrix `H` according to your measurement model's relation with the state
             // Given the example, assuming that only the first two state variables relate to the measurement model:
-            H.fill(T::zero());
-            H[(0, 0)] = T::one();
-            H[(1, 1)] = T::one();
+            h.fill(T::zero());
+            h[(0, 0)] = T::one();
+            h[(1, 1)] = T::one();
         }
     }
 
