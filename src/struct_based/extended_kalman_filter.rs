@@ -132,8 +132,8 @@ pub struct GenericNonlinearUpdateWorkspace<T: RealField + NumCast + Copy + Defau
     k: Matrix<T, Const<S>, Const<M>, ArrayStorage<T, S, M>>,
     h: Matrix<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>,
     y: Vector<T, Const<M>, ArrayStorage<T, M, 1>>,
-    I: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-    S_inv: Matrix<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>,
+    i: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
+    s_inv: Matrix<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>,
 }
 
 impl<T: RealField + NumCast + Copy + Default, const S: usize, const M: usize, MM: NonlinearMeasurementModel<M, S, T>> NonlinearUpdateWorkspace<S, M, T, MM> for GenericNonlinearUpdateWorkspace<T, S, M, MM> {
@@ -154,8 +154,8 @@ impl<T: RealField + NumCast + Copy + Default, const S: usize, const M: usize, MM
          &mut self.k,
          &mut self.h,
          &mut self.y,
-         &mut self.I,
-         &mut self.S_inv)
+         &mut self.i,
+         &mut self.s_inv)
     }
 }
 
@@ -169,8 +169,8 @@ impl<T: RealField + NumCast + Copy + Default, const S: usize, const M: usize, MM
             k: Matrix::<T, Const<S>, Const<M>, ArrayStorage<T, S, M>>::zeros(),
             h: Matrix::<T, Const<M>, Const<S>, ArrayStorage<T, M, S>>::zeros(),
             y: Vector::<T, Const<M>, ArrayStorage<T, M, 1>>::zeros(),
-            I: Matrix::<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>::identity(),
-            S_inv: Matrix::<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>::zeros(),
+            i: Matrix::<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>::identity(),
+            s_inv: Matrix::<T, Const<M>, Const<M>, ArrayStorage<T, M, M>>::zeros(),
         }
     }
 }
@@ -193,7 +193,7 @@ pub trait NonlinearUpdate<T, const S: usize, const M: usize, ISS, Workspace>: Ka
         ArrayStorage<T, M, S>: Storage<T, Const<M>, Const<S>>,
         ArrayStorage<T, S, S>: Storage<T, Const<S>, Const<S>>
     {
-        let (intermediate_state, predicted_measurement, temp, s_, k, h, y, I, S_inv) = workspace.workspace_temps();
+        let (intermediate_state, predicted_measurement, temp, s_, k, h, y, i, s_inv) = workspace.workspace_temps();
         let (state, cov) = self.state_cov();
         mapping.to_intermediate(state, intermediate_state);
         measurement_model.h(intermediate_state, predicted_measurement);
@@ -204,8 +204,8 @@ pub trait NonlinearUpdate<T, const S: usize, const M: usize, ISS, Workspace>: Ka
         *s_ = *temp * h.transpose() + measurement_model.measurement_noise();
 
         // Compute the Kalman gain using the previously computed S_
-        *S_inv = s_.try_inverse().expect("Matrix is not invertible!");
-        *k = *cov * h.transpose() * *S_inv;
+        *s_inv = s_.try_inverse().expect("Matrix is not invertible!");
+        *k = *cov * h.transpose() * *s_inv;
 
         // Compute the measurement residual
         *y = z - *predicted_measurement;
@@ -214,18 +214,18 @@ pub trait NonlinearUpdate<T, const S: usize, const M: usize, ISS, Workspace>: Ka
         *state = *state + *k * *y;
 
         // Update the error covariance matrix using workspace matrices
-        *cov = (*I - *k * *h) * *cov;
+        *cov = (*i - *k * *h) * *cov;
     }
 }
 
 pub struct ExtendedKalmanFilter<T: RealField, const S: usize> {
     x: Vector<T, Const<S>, Owned<T, Const<S>>>,
-    P: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
+    p: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
 }
 
 impl <T: RealField + NumCast + Copy + Default, const S: usize> KalmanState<T, S> for ExtendedKalmanFilter<T, S> {
     fn state_cov(&mut self) -> (&mut Vector<T, Const<S>, Owned<T, Const<S>>>, &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>) {
-        (&mut self.x, &mut self.P)
+        (&mut self.x, &mut self.p)
     }
 }
 
@@ -246,7 +246,6 @@ mod tests {
     // -- Example of two distinct states in the state space --
 
     // Define the constants
-    pub const STATE_SIZE: usize = 3;
     pub const POS_STATE_SIZE: usize = 2;
     pub const TEMP_STATE_SIZE: usize = 1;
 
@@ -342,6 +341,7 @@ mod tests {
     }
 
     // Define the robot state
+    #[allow(dead_code)]
     #[derive(Clone, Debug)]
     pub struct RobotState<T: RealField> {
         position: Vector2<T>,
@@ -401,7 +401,7 @@ mod tests {
     fn test_efk_simple() {
         let mut ekf = ExtendedKalmanFilter {
             x: Vector4::new(0.0, 0.0, 1.0, 1.0),
-            P: Matrix4::identity(),
+            p: Matrix4::identity(),
         };
 
         let gps_measurement = Vector2::new(1.0, 1.0);

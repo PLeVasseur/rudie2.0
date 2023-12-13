@@ -50,14 +50,14 @@ pub trait IntermediateStateStateMapping3<T, const I: usize, const S: usize>
     type Start: DimName + DimNameToUsize + LessThan<Self::End>;
     type End: DimName + DimNameToUsize + LessThan<Const<S>>;
 
-    const start: usize = <Self::Start as DimNameToUsize>::VALUE;
+    const START: usize = <Self::Start as DimNameToUsize>::VALUE;
 
     fn to_process<'a>(&'a self, state: &'a mut Vector<T, Const<S>, ArrayStorage<T, S, 1>>) -> VectorViewMut<'a, T, Const<I>, Const<1>, Const<S>>
     where
         ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
         ArrayStorage<T, S, 1>: RawStorage<T, Const<S>, RStride = Const<1>, CStride = Const<S>>
     {
-        state.fixed_view_mut::<I, 1>(Self::start, 0)
+        state.fixed_view_mut::<I, 1>(Self::START, 0)
     }
 
     fn jacobian_matrix<'a>(&'a self, full_jacobian: &'a mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>) -> MatrixViewMut<'a, T, Const<I>, Const<I>, Const<1>, Const<S>>
@@ -65,7 +65,7 @@ pub trait IntermediateStateStateMapping3<T, const I: usize, const S: usize>
             ArrayStorage<T, S, S>: RawStorageMut<T, Const<S>, Const<S>, RStride = Const<1>, CStride = Const<S>>,
             ArrayStorage<T, S, S>: RawStorage<T, Const<S>, Const<S>, RStride = Const<1>, CStride = Const<S>>
     {
-        full_jacobian.fixed_view_mut::<I, I>(Self::start, Self::start)
+        full_jacobian.fixed_view_mut::<I, I>(Self::START, Self::START)
     }
 
     fn noise_matrix<'a>(&'a self, full_noise: &'a mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>) -> MatrixViewMut<'a, T, Const<I>, Const<I>, Const<1>, Const<S>>
@@ -73,7 +73,7 @@ pub trait IntermediateStateStateMapping3<T, const I: usize, const S: usize>
             ArrayStorage<T, S, S>: RawStorageMut<T, Const<S>, Const<S>, RStride = Const<1>, CStride = Const<S>>,
             ArrayStorage<T, S, S>: RawStorage<T, Const<S>, Const<S>, RStride = Const<1>, CStride = Const<S>>
     {
-        full_noise.fixed_view_mut::<I, I>(Self::start, Self::start)
+        full_noise.fixed_view_mut::<I, I>(Self::START, Self::START)
     }
 }
 
@@ -282,8 +282,8 @@ struct Model1<T: RealField + NumCast + Copy + Default, const S: usize> {
 }
 impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel3<T, 3, S> for Model1<T, S> {
 
-    fn f(&self, state: &mut VectorViewMut<T, Const<3>, Const<1>, Const<{ S }>>, dt: T) {
-        let (mut one, mut two, mut three) = separate_state_vars_3(state);
+    fn f(&self, state: &mut VectorViewMut<T, Const<3>, Const<1>, Const<{ S }>>, _dt: T) {
+        let (one, two, three) = separate_state_vars_3(state);
         *one = T::one();
         *two = T::one();
         *three = T::one();
@@ -291,13 +291,13 @@ impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessM
         // Placeholder dynamics for the example
     }
 
-    fn process_noise(&self, process_noise: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, dt: T) {
+    fn process_noise(&self, process_noise: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, _dt: T) {
         process_noise[(0, 0)] = T::one();
         // todo!()
         // Placeholder dynamics for the example
     }
 
-    fn transition_jacobian(&self, state: &VectorViewMut<T, Const<3>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, dt: T) {
+    fn transition_jacobian(&self, _state: &VectorViewMut<T, Const<3>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, _dt: T) {
         jacobian[(1, 1)] = T::one();
         // todo!()
         // Placeholder dynamics for the example
@@ -309,19 +309,19 @@ struct Model2<T: RealField + NumCast + Copy + Default, const S: usize> {
     _marker: PhantomData<T>,
 }
 impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel3<T, 3, S> for Model2<T, S> {
-    fn f(&self, state: &mut VectorViewMut<T, Const<3>, Const<1>, Const<{ S }>>, dt: T) {
+    fn f(&self, state: &mut VectorViewMut<T, Const<3>, Const<1>, Const<{ S }>>, _dt: T) {
         state[0] = T::one();
         state[1] = T::one();
         state[2] = T::one();
         // todo!()
     }
 
-    fn process_noise(&self, process_noise: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, dt: T) {
+    fn process_noise(&self, process_noise: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, _dt: T) {
         process_noise[(0, 0)] = T::one();
         // todo!()
     }
 
-    fn transition_jacobian(&self, state: &VectorViewMut<T, Const<3>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, dt: T) {
+    fn transition_jacobian(&self, _state: &VectorViewMut<T, Const<3>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<3>, Const<3>, Const<1>, Const<S>>, _dt: T) {
         jacobian[(1, 1)] = T::one();
         // todo!()
     }
@@ -359,7 +359,7 @@ impl<T: Scalar + RealField + NumCast + Copy + Default> NonlinearProcessModel2<2,
     }
 
     fn process_noise(&self, mut process_noise: MatrixViewMut<T, Dyn, Dyn, Const<1>, Const<2>>) {
-        let noise_values = Matrix2::new(
+        let _noise_values = Matrix2::new(
             T::one(), T::zero(),
             T::zero(), T::one()
         );
@@ -370,7 +370,7 @@ impl<T: Scalar + RealField + NumCast + Copy + Default> NonlinearProcessModel2<2,
         // todo!()
     }
 
-    fn transition_jacobian(&self, state: &Self::IntermediateState, jacobian: &mut Self::IntermediateJacobian, dt: T) {
+    fn transition_jacobian(&self, _state: &Self::IntermediateState, _jacobian: &mut Self::IntermediateJacobian, _dt: T) {
         todo!()
     }
 }
@@ -477,7 +477,7 @@ pub trait NonlinearPredict2<T, const S: usize>: KalmanState<T, S>
             ST: IntermediateStateStateMapping2<S, T, IntermediateState = PM::IntermediateState, IntermediateJacobian = PM::IntermediateJacobian>,
             W: NonlinearPredictWorkspace2<S, T, IntermediateState = PM::IntermediateState, IntermediateJacobian = PM::IntermediateJacobian>,
     {
-        let (state, cov) = self.state_cov();
+        let (state, _cov) = self.state_cov();
         let mut combined_transition_jacobian = Matrix::<T, Const<S>, Const<S>, <DefaultAllocator as nalgebra::allocator::Allocator<T, Const<S>, Const<S>>>::Buffer>::zeros_generic(Const::<S>, Const::<S>);
 
         for (model, transition, workspace) in izip!(process_models, transitions, workspaces) {
@@ -658,7 +658,7 @@ impl<T> IntermediateStateStateMapping2<3, T> for ProcessModel1
         process_state[(1, 0)] = state[(1, 0)];
     }
 
-    fn from_process(&self, process_state: &Self::IntermediateState, state: &mut Vector<T, Const<3>, ArrayStorage<T, 3, 1>>) {
+    fn from_process(&self, _process_state: &Self::IntermediateState, state: &mut Vector<T, Const<3>, ArrayStorage<T, 3, 1>>) {
         state[(0, 0)] = T::zero();
     }
 
@@ -738,12 +738,12 @@ impl<T> IntermediateStateStateMapping2<3, T> for ProcessModel2
 
     type IntermediateJacobian = MatrixWrapper1x1<T>;
 
-    fn to_process(&self, state: &Vector<T, Const<3>, Owned<T, Const<3>>>, process_state: &mut Self::IntermediateState) {
+    fn to_process(&self, _state: &Vector<T, Const<3>, Owned<T, Const<3>>>, _process_state: &mut Self::IntermediateState) {
         // process_state[(0, 0)] = state[(0, 0)];
         // process_state[(1, 0)] = state[(1, 0)];
     }
 
-    fn from_process(&self, process_state: &Self::IntermediateState, state: &mut Vector<T, Const<3>, ArrayStorage<T, 3, 1>>) {
+    fn from_process(&self, _process_state: &Self::IntermediateState, state: &mut Vector<T, Const<3>, ArrayStorage<T, 3, 1>>) {
         state[(0, 0)] = T::zero();
     }
 
