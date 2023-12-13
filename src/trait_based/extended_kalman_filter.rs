@@ -2,10 +2,10 @@ use nalgebra::{ArrayStorage, Const, RawStorageMut, RealField, Vector};
 use num_traits::NumCast;
 
 use crate::base::types::KalmanState;
-use crate::base::types::IntermediateStateStateMapping3;
-use crate::base::types::NonlinearPredictWorkspace3;
+use crate::base::types::IntermediateStateStateMapping;
+use crate::base::types::NonlinearPredictWorkspace;
 use crate::base::types::NonlinearProcessWithControlModel;
-use crate::base::types::NonlinearProcessModel3;
+use crate::base::types::NonlinearProcessModel;
 
 // NonlinearPredictChain and NonlinearPredictWithControlChain is basically what was used to help write the proc macro
 // to allow us to get any custom number of predictions with or without control models
@@ -23,11 +23,11 @@ pub trait NonlinearPredictChain<T, const S: usize>: KalmanState<T, S>
         where
             ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
             ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
-            PM1: NonlinearProcessModel3<T, I1, S>,
-            PM2: NonlinearProcessModel3<T, I2, S>,
-            ST1: IntermediateStateStateMapping3<T, I1, S>,
-            ST2: IntermediateStateStateMapping3<T, I2, S>,
-            W: NonlinearPredictWorkspace3<T, S>,
+            PM1: NonlinearProcessModel<T, I1, S>,
+            PM2: NonlinearProcessModel<T, I2, S>,
+            ST1: IntermediateStateStateMapping<T, I1, S>,
+            ST2: IntermediateStateStateMapping<T, I2, S>,
+            W: NonlinearPredictWorkspace<T, S>,
     {
         let (state, cov) = self.state_cov();
 
@@ -78,9 +78,9 @@ pub trait NonlinearPredictWithControlChain<T, const S: usize>: KalmanState<T, S>
             ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
             PM1: NonlinearProcessWithControlModel<T, I1, C1, S>,
             PM2: NonlinearProcessWithControlModel<T, I2, C2, S>,
-            ST1: IntermediateStateStateMapping3<T, I1, S>,
-            ST2: IntermediateStateStateMapping3<T, I2, S>,
-            W: NonlinearPredictWorkspace3<T, S>,
+            ST1: IntermediateStateStateMapping<T, I1, S>,
+            ST2: IntermediateStateStateMapping<T, I2, S>,
+            W: NonlinearPredictWorkspace<T, S>,
     {
         let (state, cov) = self.state_cov();
 

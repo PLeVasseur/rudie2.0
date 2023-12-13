@@ -26,7 +26,7 @@ pub trait KalmanState<T, const S: usize>
     );
 }
 
-pub trait NonlinearProcessModel3<T, const I: usize, const S: usize>
+pub trait NonlinearProcessModel<T, const I: usize, const S: usize>
     where
         T: RealField + NumCast + Copy + Default,
         ArrayStorage<T, I, I>: Storage<T, Const<I>, Const<I>>
@@ -47,7 +47,7 @@ pub trait NonlinearProcessWithControlModel<T, const I: usize, const C: usize, co
     fn transition_jacobian(&self, state: &VectorViewMut<T, Const<I>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<I>, Const<I>, Const<1>, Const<S>>, dt: T);
 }
 
-pub trait IntermediateStateStateMapping3<T, const I: usize, const S: usize>
+pub trait IntermediateStateStateMapping<T, const I: usize, const S: usize>
     where
         T: RealField + NumCast + Copy + Default,
 {
@@ -81,7 +81,7 @@ pub trait IntermediateStateStateMapping3<T, const I: usize, const S: usize>
     }
 }
 
-pub trait NonlinearPredictWorkspace3<T, const S: usize>
+pub trait NonlinearPredictWorkspace<T, const S: usize>
     where
         T: RealField + NumCast + Copy + Default,
 {
@@ -91,12 +91,12 @@ pub trait NonlinearPredictWorkspace3<T, const S: usize>
     );
 }
 
-pub struct GenericNonlinearPredictWorkspace3<T: RealField + NumCast + Copy + Default, const S: usize> {
+pub struct GenericNonlinearPredictWorkspace<T: RealField + NumCast + Copy + Default, const S: usize> {
     process_noise: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
     transition_jacobian: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
 }
 
-impl<T: RealField + NumCast + Copy + Default, const S: usize> NonlinearPredictWorkspace3<T, S> for GenericNonlinearPredictWorkspace3<T, S> {
+impl<T: RealField + NumCast + Copy + Default, const S: usize> NonlinearPredictWorkspace<T, S> for GenericNonlinearPredictWorkspace<T, S> {
     fn workspace_temps(&mut self) -> (
         &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
         &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
@@ -105,7 +105,7 @@ impl<T: RealField + NumCast + Copy + Default, const S: usize> NonlinearPredictWo
     }
 }
 
-impl<T: RealField + NumCast + Copy + Default, const S: usize> GenericNonlinearPredictWorkspace3<T, S> {
+impl<T: RealField + NumCast + Copy + Default, const S: usize> GenericNonlinearPredictWorkspace<T, S> {
     pub fn new() -> Self {
         Self {
             process_noise: Matrix::<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>::zeros(),

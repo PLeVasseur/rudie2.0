@@ -1,4 +1,4 @@
-use nalgebra::{Const, Matrix, RawStorageMut, RealField};
+use nalgebra::{Const, RawStorageMut, RealField};
 use nalgebra::base::{ArrayStorage};
 
 use num_traits::cast::NumCast;
@@ -8,9 +8,10 @@ use rudie_proc_macro::generate_all_nonlinear_predict_chain;
 use rudie_proc_macro::generate_separate_state_vars;
 use rudie_proc_macro::generate_all_separate_state_vars;
 
-use crate::base::types::NonlinearProcessModel3;
+use crate::base::types::NonlinearProcessModel;
 use crate::base::types::KalmanState;
-use crate::base::types::IntermediateStateStateMapping3;
+use crate::base::types::IntermediateStateStateMapping;
+use crate::base::types::NonlinearPredictWorkspace;
 
 pub mod proc_macros {
     pub use rudie_proc_macro::generate_nonlinear_predict_chain_custom;
@@ -19,39 +20,6 @@ pub mod proc_macros {
 generate_all_separate_state_vars!();
 
 generate_all_nonlinear_predict_chain!();
-
-pub trait NonlinearPredictWorkspace3<T, const S: usize>
-    where
-        T: RealField + NumCast + Copy + Default,
-{
-    fn workspace_temps(&mut self) -> (
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-    );
-}
-
-pub struct GenericNonlinearPredictWorkspace3<T: RealField + NumCast + Copy + Default, const S: usize> {
-    process_noise: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-    transition_jacobian: Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-}
-
-impl<T: RealField + NumCast + Copy + Default, const S: usize> NonlinearPredictWorkspace3<T, S> for GenericNonlinearPredictWorkspace3<T, S> {
-    fn workspace_temps(&mut self) -> (
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-    ) {
-        (&mut self.process_noise, &mut self.transition_jacobian)
-    }
-}
-
-impl<T: RealField + NumCast + Copy + Default, const S: usize> GenericNonlinearPredictWorkspace3<T, S> {
-    pub fn new() -> Self {
-        Self {
-            process_noise: Matrix::<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>::zeros(),
-            transition_jacobian: Matrix::<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>::zeros(),
-        }
-    }
-}
 
 // This conditionally includes the std library when tests are being run.
 #[cfg(test)]
@@ -62,20 +30,21 @@ mod tests {
     use super::*;
     use super::proc_macros::generate_nonlinear_predict_chain_custom;
     use crate::base::types::NonlinearProcessWithControlModel;
+    use crate::base::types::GenericNonlinearPredictWorkspace;
     use core::marker::PhantomData;
     use std::{println};
-    use nalgebra::{Matrix6, MatrixViewMut, Vector, Vector6, VectorViewMut};
+    use nalgebra::{Matrix, Matrix6, MatrixViewMut, Vector, Vector6, VectorViewMut};
 
     generate_nonlinear_predict_chain_custom!(
         MyNonlinearPredictChainRenamedGenerics,
         NonlinearProcessWithControlModel<T, B, C, S>,
-        NonlinearProcessModel3<T, F, S>
+        NonlinearProcessModel<T, F, S>
     );
 
     generate_nonlinear_predict_chain_custom!(
         MyNonlinearPredictChainWithNoControlInputs,
-        NonlinearProcessModel3<T, I1, S>,
-        NonlinearProcessModel3<T, I2, S>
+        NonlinearProcessModel<T, I1, S>,
+        NonlinearProcessModel<T, I2, S>
     );
 
     #[derive(Debug)]
@@ -102,7 +71,7 @@ mod tests {
     struct Model1<T: RealField + NumCast + Copy + Default, const S: usize> {
         _marker: PhantomData<T>,
     }
-    impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel3<T, 3, S> for Model1<T, S> {
+    impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel<T, 3, S> for Model1<T, S> {
 
         fn f(&self, state: &mut VectorViewMut<T, Const<3>, Const<1>, Const<{ S }>>, _dt: T) {
             let (one, two, three) = separate_state_vars_3(state);
@@ -130,7 +99,7 @@ mod tests {
     struct Model2<T: RealField + NumCast + Copy + Default, const S: usize> {
         _marker: PhantomData<T>,
     }
-    impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel3<T, 3, S> for Model2<T, S> {
+    impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel<T, 3, S> for Model2<T, S> {
         fn f(&self, state: &mut VectorViewMut<T, Const<3>, Const<1>, Const<{ S }>>, _dt: T) {
             state[0] = T::one();
             state[1] = T::one();
@@ -150,13 +119,13 @@ mod tests {
     }
 
     struct Mapping1;
-    impl IntermediateStateStateMapping3<f64, 3, 6> for Mapping1 {
+    impl IntermediateStateStateMapping<f64, 3, 6> for Mapping1 {
         type Start = Const<0>;
         type End = Const<2>;
     }
 
     struct Mapping2;
-    impl IntermediateStateStateMapping3<f64, 3, 6> for Mapping2 {
+    impl IntermediateStateStateMapping<f64, 3, 6> for Mapping2 {
         type Start = Const<3>;
         type End = Const<5>;
     }
@@ -171,7 +140,7 @@ mod tests {
         let model2 = Model2::<f64, 6> { _marker: PhantomData };
         let mapping1 = Mapping1;
         let mapping2 = Mapping2;
-        let mut workspace = GenericNonlinearPredictWorkspace3::<f64, 6>::new();
+        let mut workspace = GenericNonlinearPredictWorkspace::<f64, 6>::new();
 
         filter.predict(
             (&model1, &model2),

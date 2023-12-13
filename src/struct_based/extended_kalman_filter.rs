@@ -8,15 +8,7 @@ use num_traits::cast::NumCast;
 use core::marker::Copy;
 use core::default::Default;
 
-pub trait KalmanState<T, const S: usize>
-    where
-        T: RealField + NumCast + Copy + Default
-{
-    fn state_cov(&mut self) -> (
-        &mut Vector<T, Const<S>, Owned<T, Const<S>>>,
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>
-    );
-}
+use crate::base::types::KalmanState;
 
 pub trait IntermediateStateSize<T: RealField> {
     type IntermediateState: Sized;

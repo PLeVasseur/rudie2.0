@@ -34,14 +34,14 @@ pub fn generate_nonlinear_predict_chain(input: TokenStream) -> TokenStream {
         let i_name = format_ident!("I{}", i);
         let pm_name = format_ident!("PM{}", i);
         quote! {
-            #pm_name: NonlinearProcessModel3<T, #i_name, S>
+            #pm_name: NonlinearProcessModel<T, #i_name, S>
         }
     });
     let st_constraints = (1..=tuple_size).map(|i| {
         let i_name = format_ident!("I{}", i);
         let st_name = format_ident!("ST{}", i);
         quote! {
-            #st_name: IntermediateStateStateMapping3<T, #i_name, S>
+            #st_name: IntermediateStateStateMapping<T, #i_name, S>
         }
     });
 
@@ -89,7 +89,7 @@ pub fn generate_nonlinear_predict_chain(input: TokenStream) -> TokenStream {
             ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
             #(#pm_constraints,)*
             #(#st_constraints,)*
-            W: NonlinearPredictWorkspace3<T, S>,
+            W: NonlinearPredictWorkspace<T, S>,
         {
                 let (state, cov) = self.state_cov();
 
@@ -276,7 +276,7 @@ impl ChainGenerator {
             }
         ];
 
-        where_constraints.push(quote!{W: NonlinearPredictWorkspace3<T, S>});
+        where_constraints.push(quote!{W: NonlinearPredictWorkspace<T, S>});
 
         // Generate the function arguments and the corresponding body processing
         let mut const_generics = vec![];
@@ -318,7 +318,7 @@ impl ChainGenerator {
                 const_generics.push(quote! { const #i_type: usize });
 
                 where_constraints.push(quote! {
-                    #st_ident: IntermediateStateStateMapping3<#t_type, #i_type, #s_type>
+                    #st_ident: IntermediateStateStateMapping<#t_type, #i_type, #s_type>
                 });
 
                 where_constraints.push(quote! {
@@ -349,11 +349,11 @@ impl ChainGenerator {
                 const_generics.push(quote! { const #i_type: usize });
 
                 where_constraints.push(quote! {
-                    #st_ident: IntermediateStateStateMapping3<#t_type, #i_type, #s_type>
+                    #st_ident: IntermediateStateStateMapping<#t_type, #i_type, #s_type>
                 });
 
                 where_constraints.push(quote! {
-                    #pm_ident: NonlinearProcessModel3<#t_type, #i_type, #s_type>
+                    #pm_ident: NonlinearProcessModel<#t_type, #i_type, #s_type>
                 });
 
                 process_function_body.push(quote! {
