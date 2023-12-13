@@ -1,0 +1,15 @@
+[package]
+name = "rudie"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rudie-proc-macro = { path = "rudie-proc-macro" }
+
+itertools = { version = "0.11.0", features = [] }
+nalgebra = "0.32.3"
+num-traits = "0.2"
+paste = { version = "1.0.14", features = [] }
+typenum = "1.17.0"
