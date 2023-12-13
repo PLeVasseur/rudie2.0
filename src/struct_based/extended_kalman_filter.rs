@@ -1,24 +1,12 @@
-use nalgebra::{Matrix, Matrix2, Matrix4, Vector, Vector2, RealField, Vector4, Vector1, DefaultAllocator, DimName, U1, Dim, U2, Scalar, OMatrix, Dyn, MatrixViewMut, Vector3, Matrix3, ToTypenum, VectorSliceMut, VectorViewMut, Dynamic, RawStorageMut, RawStorage};
+use nalgebra::{Matrix, Matrix2, Vector, Vector2, RealField, Vector4, Vector1};
 use nalgebra::base::{ArrayStorage, Storage};
 use nalgebra::base::dimension::{Const};
 use nalgebra::storage::Owned;
 
 use num_traits::cast::NumCast;
 
-use itertools::izip;
-
-use typenum::consts::*;
-use typenum::Cmp;
-use typenum::Less;
-use typenum::type_operators::IsLess;
-use typenum::type_operators::IsLessOrEqual;
-use core::marker::PhantomData;
-
 use core::marker::Copy;
 use core::default::Default;
-use core::ops::Deref;
-
-use typenum::{Unsigned, UInt, UTerm};
 
 pub trait KalmanState<T, const S: usize>
     where
@@ -405,8 +393,8 @@ extern crate std;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{println, vec};
-    use nalgebra::{Matrix6, Vector6};
+    use std::{println};
+    use nalgebra::{Matrix4};
 
     #[test]
     fn test_efk_simple() {

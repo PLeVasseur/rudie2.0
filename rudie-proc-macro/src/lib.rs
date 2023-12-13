@@ -1,11 +1,9 @@
 extern crate proc_macro;
 
 use proc_macro::{TokenStream};
-use std::fmt::Arguments;
 use proc_macro2::{Ident};
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, LitInt, Path, Type, GenericArgument, PathArguments};
-use syn::parse::Parser;
+use syn::{parse_macro_input, LitInt, Type, GenericArgument, PathArguments};
 use syn::punctuated::Punctuated;
 
 #[proc_macro]
@@ -160,7 +158,7 @@ pub fn generate_separate_state_vars(input: TokenStream) -> TokenStream {
         }
     }).collect();
 
-    let return_tuples: Vec<_> = ptr_ids.iter().map(|id| {
+    let return_tuples: Vec<_> = ptr_ids.iter().map(|_id| {
         quote! {
             &'a mut T
         }
@@ -208,7 +206,7 @@ pub fn generate_nonlinear_predict_chain_custom(input: TokenStream) -> TokenStrea
     let input = parse_macro_input!(input as ChainGenerator);
     let expanded = input.generate();
 
-    println!("{}", expanded.to_string());
+    // println!("{}", expanded.to_string());
 
     expanded.into()
 }
@@ -219,7 +217,6 @@ struct ChainGenerator {
 }
 
 struct ProcessModel {
-    path: Path,
     generics: Vec<Type>,
     has_control: bool,
 }
@@ -249,7 +246,7 @@ impl syn::parse::Parse for ProcessModel {
         let has_control = path.segments.iter().any(|segment| {
             segment.ident == "NonlinearProcessWithControlModel"
         });
-        Ok(ProcessModel { path, generics, has_control })
+        Ok(ProcessModel { generics, has_control })
     }
 }
 
