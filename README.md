@@ -3,6 +3,14 @@
 An experimental re-imagining of the [rudie](https://github.com/PLeVasseur/rudie)
 library for Kalman Filters, still `#![no_std]`.
 
+## Status
+
+Pre-pre-pre-alpha
+
+* The architecture is in place
+* Would like to flesh out library of measurement models and
+  process models
+
  ## Philosophy
 * Make use of Rust's const generics (previous version in 2018 before they
   were available)
