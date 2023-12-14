@@ -12,9 +12,7 @@ Pre-pre-pre-alpha
   process models
 * Generally need to improve docs
 
- ## Philosophy
-* Make use of Rust's const generics (previous version in 2018 before they
-  were available)
+ ## Useful for Embedded
 * Available for embedded devices without an RTOS
 * No dynamic heap memory allocations, pre-allocated within Workspaces
 
