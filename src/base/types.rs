@@ -1,12 +1,21 @@
-use rudie_proc_macro::{generate_less_than_impls};
+use rudie_proc_macro::{generate_all_separate_state_vars, generate_less_than_impls, generate_less_than_or_equal_impls};
 
 use nalgebra::base::dimension::{Const};
 use nalgebra::{ArrayStorage, DimName, Matrix, MatrixViewMut, Owned, RawStorage, RawStorageMut, RealField, Storage, Vector, VectorViewMut};
 use num_traits::NumCast;
 
 pub trait LessThan<RHS> {}
+pub trait LessThanOrEqual<RHS> {}
 
 generate_less_than_impls!();
+generate_less_than_or_equal_impls!();
+
+pub mod separate_state_vars {
+    use nalgebra::{RealField, Const};
+    use num_traits::NumCast;
+    use rudie_proc_macro::{generate_separate_state_vars, generate_all_separate_state_vars};
+    generate_all_separate_state_vars!();
+}
 
 pub trait DimNameToUsize {
     const VALUE: usize;
@@ -51,7 +60,7 @@ pub trait IntermediateStateStateMapping<T, const I: usize, const S: usize>
     where
         T: RealField + NumCast + Copy + Default,
 {
-    type Start: DimName + DimNameToUsize + LessThan<Self::End>;
+    type Start: DimName + DimNameToUsize + LessThanOrEqual<Self::End>;
     type End: DimName + DimNameToUsize + LessThan<Const<S>>;
 
     const START: usize = <Self::Start as DimNameToUsize>::VALUE;

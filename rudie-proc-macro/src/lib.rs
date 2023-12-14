@@ -22,6 +22,21 @@ pub fn generate_less_than_impls(_input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn generate_less_than_or_equal_impls(_input: TokenStream) -> TokenStream {
+    let mut generated_code = quote! {};
+
+    for lhs in 1usize..=127 {
+        for rhs in 0..=lhs {  // include lhs in the range for rhs
+            generated_code.extend(quote! {
+                impl LessThanOrEqual<Const<#lhs>> for Const<#rhs> {}
+            });
+        }
+    }
+
+    generated_code.into()
+}
+
+#[proc_macro]
 pub fn generate_nonlinear_predict_chain(input: TokenStream) -> TokenStream {
     // Parse the input to get the tuple size.
     let tuple_size: usize = parse_macro_input!(input as LitInt).base10_parse().unwrap();
@@ -183,8 +198,8 @@ pub fn generate_separate_state_vars(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn generate_all_separate_state_vars(_input: TokenStream) -> TokenStream {
-    // Generate a sequence of numbers from 2 to 127.
-    let range: Vec<_> = (2..=127).collect();
+    // Generate a sequence of numbers from 1 to 127.
+    let range: Vec<_> = (1..=127).collect();
 
     // For each number, generate a call to `generate_separate_state_vars!`.
     let expansions: Vec<_> = range.iter().map(|&n| {

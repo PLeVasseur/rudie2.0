@@ -1,4 +1,4 @@
-use nalgebra::{Matrix, Vector, RealField};
+use nalgebra::{Matrix, Vector, RealField, RawStorageMut};
 use nalgebra::base::{ArrayStorage, Storage};
 use nalgebra::base::dimension::{Const};
 use nalgebra::storage::Owned;
@@ -9,74 +9,44 @@ use core::marker::Copy;
 use core::default::Default;
 
 use crate::base::types::KalmanState;
+use crate::base::types::NonlinearProcessModel;
+use crate::base::types::NonlinearPredictWorkspace;
+use crate::base::types::IntermediateStateStateMapping;
 
 pub trait IntermediateStateSize<T: RealField> {
     type IntermediateState: Sized;
 }
 
-pub trait NonlinearProcessModel<const S: usize, T>: IntermediateStateSize<T>
-    where
-        T: RealField + NumCast + Copy + Default
-{
-    fn f(&self, state: &mut Self::IntermediateState, dt: T);
-    fn process_noise(&self, process_noise: &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>);
-    fn transition_jacobian(&self, state: &Vector<T, Const<S>, Owned<T, Const<S>>>, jacobian: &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>, dt: T);
-}
-
-
-pub trait NonlinearPredictWorkspace<const S: usize, T, ISS: IntermediateStateSize<T>>
-    where
-        T: RealField + NumCast + Copy + Default
-{
-    fn workspace_temps(&mut self) -> (
-        &mut ISS::IntermediateState,
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-        &mut Matrix<T, Const<S>, Const<S>, ArrayStorage<T, S, S>>,
-    );
-}
-
-pub trait IntermediateStateStateMapping<const S: usize, T, ISS: IntermediateStateSize<T>>
-    where
-        T: RealField + NumCast + Copy + Default
-{
-    fn to_process(&self, state: &Vector<T, Const<S>, Owned<T, Const<S>>>, process_state: &mut ISS::IntermediateState);
-    fn from_process(&self, process_state: &ISS::IntermediateState, state: &mut Vector<T, Const<S>, ArrayStorage<T, S, 1>>);
-
-    /// Returns the range of indices in the state vector that the intermediate state maps to.
-    fn jacobian_range(&self) -> (usize, usize);
-
-    /// Returns the range of indices in the noise matrix that the intermediate state's process noise maps to.
-    fn noise_range(&self) -> (usize, usize);
-}
-
-pub trait NonlinearPredict<T, const S: usize, ISS, Workspace>: KalmanState<T, S>
+pub trait NonlinearPredict<T, const S: usize>: KalmanState<T, S>
     where
         T: RealField + NumCast + Copy + Default,
-        ISS: IntermediateStateSize<T>,
-        Workspace: NonlinearPredictWorkspace<S, T, ISS>,
 {
-    fn predict<PM, ST>(
+    fn predict<const I: usize, PM, ST, W>(
         &mut self,
         process_model: &PM,
         transition: &ST,
-        workspace: &mut Workspace,
+        workspace: &mut W,
         dt: T
     )
         where
-            ArrayStorage<T, S, S>: Storage<T, Const<S>, Const<S>>,
-            PM: NonlinearProcessModel<S, T, IntermediateState=ISS::IntermediateState>,
-            ST: IntermediateStateStateMapping<S, T, PM>
+            ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
+            PM: NonlinearProcessModel<T, I, S>,
+            ST: IntermediateStateStateMapping<T, I, S>,
+            W: NonlinearPredictWorkspace<T, S>,
     {
-        let (process_state, process_noise, transition_jacobian) = workspace.workspace_temps();
         let (state, cov) = self.state_cov();
 
-        transition.to_process(state, process_state);
-        process_model.f(process_state, dt);
-        transition.from_process(process_state, state);
+        // TODO: Probably less error-prone to zero out the combined transition jacobian and combined_process_before returning it from workspace
+        let (combined_transition_jacobian, combined_process_noise) = workspace.workspace_temps();
 
-        process_model.transition_jacobian(state, transition_jacobian, dt);
-        process_model.process_noise(process_noise);
-        *cov = *transition_jacobian * *cov * transition_jacobian.transpose() + *process_noise;
+        let mut intermediate_state = transition.to_process(state);
+        process_model.f(&mut intermediate_state, dt);
+        let mut intermediate_jacobian = transition.jacobian_matrix(combined_transition_jacobian);
+        process_model.transition_jacobian(&intermediate_state, &mut intermediate_jacobian, dt);
+        let mut intermediate_noise = transition.noise_matrix(combined_process_noise);
+        process_model.process_noise(&mut intermediate_noise, dt);
+
+        *cov = *combined_transition_jacobian * *cov * (*combined_transition_jacobian).transpose() + *combined_process_noise;
     }
 }
 
@@ -222,7 +192,8 @@ impl <T: RealField + NumCast + Copy + Default, const S: usize> KalmanState<T, S>
 }
 
 impl <T: RealField + NumCast + Copy + Default, const S: usize, const M: usize, ISS: IntermediateStateSize<T>, Workspace: NonlinearUpdateWorkspace<S, M, T, ISS>> NonlinearUpdate<T, S, M, ISS, Workspace> for ExtendedKalmanFilter<T, S> {}
-impl <T: RealField + NumCast + Copy + Default, const S: usize, ISS: IntermediateStateSize<T>, Workspace: NonlinearPredictWorkspace<S, T, ISS>> NonlinearPredict<T, S, ISS, Workspace> for ExtendedKalmanFilter<T, S> {}
+impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearPredict<T, S> for ExtendedKalmanFilter<T, S> {}
+
 
 
 // This conditionally includes the std library when tests are being run.
@@ -231,61 +202,14 @@ extern crate std;
 
 #[cfg(test)]
 mod tests {
+    use core::marker::PhantomData;
     use super::*;
     use std::{println};
-    use nalgebra::{Matrix2, Matrix4, Vector1, Vector2, Vector4};
+    use nalgebra::{Matrix2, Matrix4, MatrixViewMut, Vector2, Vector4, VectorViewMut};
+    use crate::base::GenericNonlinearPredictWorkspace;
+    use crate::base::types::separate_state_vars::*;
 
     // -- Example of two distinct states in the state space --
-
-    // Define the constants
-    pub const POS_STATE_SIZE: usize = 2;
-    pub const TEMP_STATE_SIZE: usize = 1;
-
-    struct KinematicsMeasurementModel;
-
-    impl<T: RealField + NumCast + Copy + Default> IntermediateStateSize<T> for KinematicsMeasurementModel {
-        type IntermediateState = Vector2<T>;
-    }
-
-    impl<T: RealField + NumCast + Copy + Default, const S: usize> NonlinearMeasurementModel<2, S, T> for KinematicsMeasurementModel {
-
-        fn initialize_state(&self) -> Self::IntermediateState {
-            Vector2::<T>::zeros()
-        }
-
-        fn h(&self, state: &Self::IntermediateState, out: &mut Vector2<T>) {
-            out[0] = state[0];
-            out[1] = state[1];
-        }
-
-        fn measurement_noise(&self) -> Matrix2<T> {
-            Matrix2::new(
-                NumCast::from(0.01).unwrap_or_else(T::zero),
-                NumCast::from(0.0).unwrap_or_else(T::zero),
-                NumCast::from(0.0).unwrap_or_else(T::zero),
-                NumCast::from(0.01).unwrap_or_else(T::zero)
-            )
-        }
-
-        fn measurement_jacobian(&self, _state: &Vector<T, Const<S>, Owned<T, Const<S>>>, h: &mut Matrix<T, Const<2>, Const<S>, ArrayStorage<T, 2, S>>) {
-            // Fill in the Jacobian matrix `H` according to your measurement model's relation with the state
-            // Given the example, assuming that only the first two state variables relate to the measurement model:
-            h.fill(T::zero());
-            h[(0, 0)] = T::one();
-            h[(1, 1)] = T::one();
-        }
-    }
-
-    struct KinematicsIntermediateMeasurmentStateMapping;
-
-    impl<T: RealField + NumCast + Copy + Default> IntermediateMeasurmentStateMapping<4, 2, T, KinematicsMeasurementModel> for KinematicsIntermediateMeasurmentStateMapping {
-        // type Workspace = GenericNonlinearUpdateWorkspace<T, 4, 2, KinematicsMeasurementModel>;
-
-        fn to_intermediate(&self, state: &Vector4<T>, out: &mut Vector2<T>) {
-            out[0] = state[2];
-            out[1] = state[3];
-        }
-    }
 
     struct GpsMeasurementModel;
 
@@ -332,60 +256,63 @@ mod tests {
         }
     }
 
-    // Define the robot state
-    #[allow(dead_code)]
-    #[derive(Clone, Debug)]
-    pub struct RobotState<T: RealField> {
-        position: Vector2<T>,
-        temperature: T,
-    }
-
     // MotionModel for evolving the position
-    pub struct MotionModel<T: RealField> {
-        velocity: Vector2<T>,
+    pub struct MotionModel<T: RealField + NumCast + Copy + Default, const S: usize> {
+        _marker: PhantomData<T>,
     }
 
-    impl<T: RealField> IntermediateStateSize<T> for MotionModel<T> {
-        type IntermediateState = Vector2<T>;
+    impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel<T, 2, S> for MotionModel<T, S> {
+        fn f(&self, state: &mut VectorViewMut<T, Const<2>, Const<1>, Const<{ S }>>, _dt: T) {
+            let (vx, vy) = separate_state_vars_2(state);
+            *vx = T::one();
+            *vy = T::one();
+        }
+
+        fn process_noise(&self, process_noise: &mut MatrixViewMut<T, Const<2>, Const<2>, Const<1>, Const<S>>, _dt: T) {
+            process_noise[(0, 0)] = T::one();
+            // todo!()
+            // Placeholder dynamics for the example
+        }
+
+        fn transition_jacobian(&self, _state: &VectorViewMut<T, Const<2>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<2>, Const<2>, Const<1>, Const<S>>, _dt: T) {
+            jacobian[(1, 1)] = T::one();
+            // todo!()
+            // Placeholder dynamics for the example
+        }
     }
 
-    impl<T: RealField + NumCast + Copy + Default> NonlinearProcessModel<POS_STATE_SIZE, T> for MotionModel<T> {
-
-        fn f(&self, state: &mut Self::IntermediateState, dt: T) {
-            *state += self.velocity * dt;
-        }
-
-        fn process_noise(&self, process_noise: &mut Matrix2<T>) {
-            // Here we just add some simple noise for the demonstration
-            process_noise.fill_diagonal(T::from_f64(0.1).unwrap());
-        }
-
-        fn transition_jacobian(&self, _: &Vector2<T>, jacobian: &mut Matrix2<T>, _: T) {
-            jacobian.fill_diagonal(T::one());
-        }
+    struct TemperatureModel<T: RealField + NumCast + Copy + Default, const S: usize> {
+        _marker: PhantomData<T>,
     }
 
-    // TemperatureModel for evolving the temperature
-    pub struct TemperatureModel;
-
-    impl<T: RealField> IntermediateStateSize<T> for TemperatureModel {
-        type IntermediateState = Vector1<T>;
+    struct MotionModelMapping;
+    impl IntermediateStateStateMapping<f64, 2, 4> for MotionModelMapping {
+        type Start = Const<0>;
+        type End = Const<1>;
     }
 
-    impl<T: RealField + NumCast + Copy + Default> NonlinearProcessModel<TEMP_STATE_SIZE, T> for TemperatureModel {
+    struct TempuratureModelMapping;
+    impl IntermediateStateStateMapping<f64, 1, 4> for TempuratureModelMapping {
+        type Start = Const<2>;
+        type End = Const<2>;
+    }
 
-        fn f(&self, _state: &mut Self::IntermediateState, _: T) {
-            // In this example, the temperature doesn't change, but in a more complex model,
-            // we would have equations to evolve the temperature based on some conditions.
+    impl <T: RealField + NumCast + Copy + Default, const S: usize> NonlinearProcessModel<T, 1, S> for crate::struct_based::extended_kalman_filter::tests::TemperatureModel<T, S> {
+        fn f(&self, state: &mut VectorViewMut<T, Const<1>, Const<1>, Const<{ S }>>, _dt: T) {
+            let (temp,) = separate_state_vars_1(state);
+            *temp = T::one();
         }
 
-        fn process_noise(&self, process_noise: &mut Matrix<T, Const<TEMP_STATE_SIZE>, Const<TEMP_STATE_SIZE>, ArrayStorage<T, TEMP_STATE_SIZE, TEMP_STATE_SIZE>>) {
-            // Add some temperature measurement noise
-            process_noise[(0, 0)] = T::from_f64(0.5).unwrap();
+        fn process_noise(&self, process_noise: &mut MatrixViewMut<T, Const<1>, Const<1>, Const<1>, Const<S>>, _dt: T) {
+            process_noise[(0, 0)] = T::one();
+            // todo!()
+            // Placeholder dynamics for the example
         }
 
-        fn transition_jacobian(&self, _: &Vector1<T>, jacobian: &mut Matrix<T, Const<TEMP_STATE_SIZE>, Const<TEMP_STATE_SIZE>, ArrayStorage<T, TEMP_STATE_SIZE, TEMP_STATE_SIZE>>, _: T) {
+        fn transition_jacobian(&self, _state: &VectorViewMut<T, Const<1>, Const<1>, Const<S>>, jacobian: &mut MatrixViewMut<T, Const<1>, Const<1>, Const<1>, Const<S>>, _dt: T) {
             jacobian[(0, 0)] = T::one();
+            // todo!()
+            // Placeholder dynamics for the example
         }
     }
 
@@ -397,17 +324,21 @@ mod tests {
         };
 
         let gps_measurement = Vector2::new(1.0, 1.0);
-        let kinematics_measurement = Vector2::new(0.9, 1.1);
 
         let gps_model = GpsMeasurementModel;
         let gps_mapping = GpsIntermediateMeasurmentStateMapping;
         let mut gps_workspace = GenericNonlinearUpdateWorkspace::new(Default::default());
         ekf.update(&gps_measurement, &gps_model, &gps_mapping, &mut gps_workspace);
 
-        let kinematics_model = KinematicsMeasurementModel;
-        let kinematics_mapping = KinematicsIntermediateMeasurmentStateMapping;
-        let mut kinematics_workspace = GenericNonlinearUpdateWorkspace::new(Default::default());
-        ekf.update(&kinematics_measurement, &kinematics_model, &kinematics_mapping, &mut kinematics_workspace);
+        let motion_model = MotionModel::<f64, 4> { _marker: Default::default() };
+        let motion_transition = MotionModelMapping;
+        let mut predict_workspace = GenericNonlinearPredictWorkspace::<f64, 4>::new();
+        ekf.predict(
+            &motion_model,
+            &motion_transition,
+            &mut predict_workspace,
+            0.0
+        );
 
         println!("{:?}", ekf.x);
     }

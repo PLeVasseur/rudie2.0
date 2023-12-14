@@ -22,7 +22,6 @@ pub trait NonlinearPredictChain<T, const S: usize>: KalmanState<T, S>
     )
         where
             ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
-            ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>,
             PM1: NonlinearProcessModel<T, I1, S>,
             PM2: NonlinearProcessModel<T, I2, S>,
             ST1: IntermediateStateStateMapping<T, I1, S>,

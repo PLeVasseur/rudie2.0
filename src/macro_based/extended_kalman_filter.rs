@@ -5,8 +5,6 @@ use num_traits::cast::NumCast;
 
 use rudie_proc_macro::generate_nonlinear_predict_chain;
 use rudie_proc_macro::generate_all_nonlinear_predict_chain;
-use rudie_proc_macro::generate_separate_state_vars;
-use rudie_proc_macro::generate_all_separate_state_vars;
 
 use crate::base::types::NonlinearProcessModel;
 use crate::base::types::KalmanState;
@@ -16,8 +14,6 @@ use crate::base::types::NonlinearPredictWorkspace;
 pub mod proc_macros {
     pub use rudie_proc_macro::generate_nonlinear_predict_chain_custom;
 }
-
-generate_all_separate_state_vars!();
 
 generate_all_nonlinear_predict_chain!();
 
@@ -31,6 +27,7 @@ mod tests {
     use super::proc_macros::generate_nonlinear_predict_chain_custom;
     use crate::base::types::NonlinearProcessWithControlModel;
     use crate::base::types::GenericNonlinearPredictWorkspace;
+    use crate::base::types::separate_state_vars::*;
     use core::marker::PhantomData;
     use std::{println};
     use nalgebra::{Matrix, Matrix6, MatrixViewMut, Vector, Vector6, VectorViewMut};
