@@ -1,4 +1,4 @@
-use rudie_proc_macro::{generate_all_separate_state_vars, generate_less_than_impls, generate_less_than_or_equal_impls};
+use rudie_proc_macro::{generate_less_than_impls, generate_less_than_or_equal_impls};
 
 use nalgebra::base::dimension::{Const};
 use nalgebra::{ArrayStorage, DimName, Matrix, MatrixViewMut, Owned, RawStorage, RawStorageMut, RealField, Storage, Vector, VectorViewMut};
