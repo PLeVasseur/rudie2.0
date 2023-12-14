@@ -17,6 +17,9 @@ Pre-pre-pre-alpha
   were available)
 * Available for embedded devices without an RTOS
 * No dynamic heap memory allocations, pre-allocated within Workspaces
+
+## Library Architecture
+
 * Attempt to make a "toolkit", where it's possible to have shared building
   blocks throughout the library and you can reach down the level of
   specificity needed for your problem
@@ -25,6 +28,25 @@ Pre-pre-pre-alpha
   this would allow us to have a library of different measurement and
   process models that could be used in different configurations.
 
-## Library Architecture
 
-![rudie2.0_architecture.png](diagrams/rudie2.0_architecture.png)
+### Model Layer
+
+![Model_Layer](diagrams/model_layer.png)
+
+### Mapping Layer
+
+![Mapping_Layer](diagrams/mapping_layer.png)
+
+### Filter Layer
+
+![Filter_Layer](diagrams/filter_layer.png)
+
+### Examples
+
+####  Struct-based approach
+
+![Struct_Based_Approach](diagrams/example_1.png)
+
+#### Custom macro-based approach
+
+![Custom_Macro_Based_Approach](diagrams/example_2.png)
