@@ -10,6 +10,7 @@ Pre-pre-pre-alpha
 * The architecture is in place
 * Would like to flesh out library of measurement models and
   process models
+* Generally need to improve docs
 
  ## Philosophy
 * Make use of Rust's const generics (previous version in 2018 before they
