@@ -1,11 +1,13 @@
 # Rudie2.0
 
 An experimental re-imagining of the [rudie](https://github.com/PLeVasseur/rudie)
-library for Kalman Filters.
+library for Kalman Filters, still `#![no_std]`.
 
  ## Philosophy
 * Make use of Rust's const generics (previous version in 2018 before they
   were available)
+* Available for embedded devices without an RTOS
+* No dynamic heap memory allocations, pre-allocated within Workspaces
 * Attempt to make a "toolkit", where it's possible to have shared building
   blocks throughout the library and you can reach down the level of
   specificity needed for your problem
