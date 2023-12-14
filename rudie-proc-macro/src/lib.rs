@@ -1,16 +1,17 @@
 extern crate proc_macro;
 
-use proc_macro::{TokenStream};
-use proc_macro2::{Ident};
+use proc_macro::TokenStream;
+use proc_macro2::Ident;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, LitInt, Type, GenericArgument, PathArguments};
 use syn::punctuated::Punctuated;
+use syn::{parse_macro_input, GenericArgument, LitInt, PathArguments, Type};
 
 #[proc_macro]
 pub fn generate_less_than_impls(_input: TokenStream) -> TokenStream {
     let mut generated_code = quote! {};
 
-    for lhs in 1usize..=127 {  // starting from 1 to allow 0 as a valid rhs
+    for lhs in 1usize..=127 {
+        // starting from 1 to allow 0 as a valid rhs
         for rhs in 0..lhs {
             generated_code.extend(quote! {
                 impl LessThan<Const<#lhs>> for Const<#rhs> {}
@@ -26,7 +27,8 @@ pub fn generate_less_than_or_equal_impls(_input: TokenStream) -> TokenStream {
     let mut generated_code = quote! {};
 
     for lhs in 1usize..=127 {
-        for rhs in 0..=lhs {  // include lhs in the range for rhs
+        for rhs in 0..=lhs {
+            // include lhs in the range for rhs
             generated_code.extend(quote! {
                 impl LessThanOrEqual<Const<#lhs>> for Const<#rhs> {}
             });
@@ -61,8 +63,12 @@ pub fn generate_nonlinear_predict_chain(input: TokenStream) -> TokenStream {
     });
 
     // Generate model names and transition names
-    let model_names = (1..=tuple_size).map(|i| format_ident!("model{}", i)).collect::<Vec<_>>();
-    let transition_names = (1..=tuple_size).map(|i| format_ident!("transition{}", i)).collect::<Vec<_>>();
+    let model_names = (1..=tuple_size)
+        .map(|i| format_ident!("model{}", i))
+        .collect::<Vec<_>>();
+    let transition_names = (1..=tuple_size)
+        .map(|i| format_ident!("transition{}", i))
+        .collect::<Vec<_>>();
 
     let model_code = model_names.iter().zip(transition_names.iter()).map(|(model_name, transition_name)| {
         quote! {
@@ -86,7 +92,6 @@ pub fn generate_nonlinear_predict_chain(input: TokenStream) -> TokenStream {
 
     // Generate model code.
     let model_code = model_code.collect::<Vec<_>>();
-
 
     let expanded = quote! {
     pub trait #trait_name<T, const S: usize>: KalmanState<T, S>
@@ -130,7 +135,7 @@ pub fn generate_nonlinear_predict_chain(input: TokenStream) -> TokenStream {
 pub fn generate_all_nonlinear_predict_chain(_input: TokenStream) -> TokenStream {
     // Generate the repeated calls
     let repeated_calls: Vec<_> = (2..=127)
-    // let repeated_calls: Vec<_> = (2..=127)
+        // let repeated_calls: Vec<_> = (2..=127)
         .map(|i| {
             let tokens = quote! {
                 generate_nonlinear_predict_chain!(#i);
@@ -158,26 +163,39 @@ pub fn generate_separate_state_vars(input: TokenStream) -> TokenStream {
         .collect();
 
     // Create the function name `separate_state_vars_N`.
-    let function_name = syn::Ident::new(&format!("separate_state_vars_{}", n), proc_macro2::Span::call_site());
+    let function_name = syn::Ident::new(
+        &format!("separate_state_vars_{}", n),
+        proc_macro2::Span::call_site(),
+    );
 
     // Construct the body of the function.
-    let ptr_initializations: Vec<_> = ptr_ids.iter().enumerate().map(|(index, id)| {
-        quote! {
-            let #id: *mut T = &mut state[#index];
-        }
-    }).collect();
+    let ptr_initializations: Vec<_> = ptr_ids
+        .iter()
+        .enumerate()
+        .map(|(index, id)| {
+            quote! {
+                let #id: *mut T = &mut state[#index];
+            }
+        })
+        .collect();
 
-    let ptr_dereferences: Vec<_> = ptr_ids.iter().map(|id| {
-        quote! {
-            unsafe { &mut *#id }
-        }
-    }).collect();
+    let ptr_dereferences: Vec<_> = ptr_ids
+        .iter()
+        .map(|id| {
+            quote! {
+                unsafe { &mut *#id }
+            }
+        })
+        .collect();
 
-    let return_tuples: Vec<_> = ptr_ids.iter().map(|_id| {
-        quote! {
-            &'a mut T
-        }
-    }).collect();
+    let return_tuples: Vec<_> = ptr_ids
+        .iter()
+        .map(|_id| {
+            quote! {
+                &'a mut T
+            }
+        })
+        .collect();
 
     // Create the final expanded code.
     let expanded = quote! {
@@ -202,11 +220,14 @@ pub fn generate_all_separate_state_vars(_input: TokenStream) -> TokenStream {
     let range: Vec<_> = (1..=127).collect();
 
     // For each number, generate a call to `generate_separate_state_vars!`.
-    let expansions: Vec<_> = range.iter().map(|&n| {
-        quote! {
-            generate_separate_state_vars!(#n);
-        }
-    }).collect();
+    let expansions: Vec<_> = range
+        .iter()
+        .map(|&n| {
+            quote! {
+                generate_separate_state_vars!(#n);
+            }
+        })
+        .collect();
 
     // Expand all of these into the final token stream.
     let expanded = quote! {
@@ -240,8 +261,12 @@ impl syn::parse::Parse for ChainGenerator {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let chain_name: proc_macro2::Ident = input.parse()?;
         input.parse::<syn::Token![,]>()?;
-        let process_models = Punctuated::<ProcessModel, syn::Token![,]>::parse_separated_nonempty(input)?;
-        Ok(ChainGenerator { chain_name, process_models })
+        let process_models =
+            Punctuated::<ProcessModel, syn::Token![,]>::parse_separated_nonempty(input)?;
+        Ok(ChainGenerator {
+            chain_name,
+            process_models,
+        })
     }
 }
 
@@ -258,14 +283,20 @@ impl syn::parse::Parse for ProcessModel {
             }
         }
 
-        let has_control = path.segments.iter().any(|segment| {
-            segment.ident == "NonlinearProcessWithControlModel"
-        });
-        Ok(ProcessModel { generics, has_control })
+        let has_control = path
+            .segments
+            .iter()
+            .any(|segment| segment.ident == "NonlinearProcessWithControlModel");
+        Ok(ProcessModel {
+            generics,
+            has_control,
+        })
     }
 }
 
-fn extract_types_with_control(slice: &[syn::Type]) -> Option<(&syn::Type, &syn::Type, &syn::Type, &syn::Type)> {
+fn extract_types_with_control(
+    slice: &[syn::Type],
+) -> Option<(&syn::Type, &syn::Type, &syn::Type, &syn::Type)> {
     if slice.len() >= 4 {
         Some((&slice[0], &slice[1], &slice[2], &slice[3]))
     } else {
@@ -273,7 +304,9 @@ fn extract_types_with_control(slice: &[syn::Type]) -> Option<(&syn::Type, &syn::
     }
 }
 
-fn extract_types_without_control(slice: &[syn::Type]) -> Option<(&syn::Type, &syn::Type, &syn::Type)> {
+fn extract_types_without_control(
+    slice: &[syn::Type],
+) -> Option<(&syn::Type, &syn::Type, &syn::Type)> {
     if slice.len() >= 3 {
         Some((&slice[0], &slice[1], &slice[2]))
     } else {
@@ -285,13 +318,11 @@ impl ChainGenerator {
     fn generate(&self) -> proc_macro2::TokenStream {
         let chain_name = &self.chain_name;
 
-        let mut where_constraints = vec![
-            quote! {
-                ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>
-            }
-        ];
+        let mut where_constraints = vec![quote! {
+            ArrayStorage<T, S, 1>: RawStorageMut<T, Const<S>, RStride = Const<1>, CStride = Const<S>>
+        }];
 
-        where_constraints.push(quote!{W: NonlinearPredictWorkspace<T, S>});
+        where_constraints.push(quote! {W: NonlinearPredictWorkspace<T, S>});
 
         // Generate the function arguments and the corresponding body processing
         let mut const_generics = vec![];
@@ -316,18 +347,17 @@ impl ChainGenerator {
             process_model_params.push(quote! { &#pm_ident });
             mapping_params.push(quote! { &#st_ident });
 
-            process_model_unpack_tuple.push(quote!{#pm_unpack_tuple});
-            mapping_unpack_tuple.push(quote!{#map_unpack_tuple});
+            process_model_unpack_tuple.push(quote! {#pm_unpack_tuple});
+            mapping_unpack_tuple.push(quote! {#map_unpack_tuple});
 
             if model.has_control {
-                let types = extract_types_with_control(&model.generics).unwrap_or_else(|| {
-                    panic!("Expected at least 4 generics for the model!")
-                });
+                let types = extract_types_with_control(&model.generics)
+                    .unwrap_or_else(|| panic!("Expected at least 4 generics for the model!"));
 
                 let (t_type, i_type, c_type, s_type) = types;
 
                 let ctrl_unpack_tuple = format_ident!("ci{}", index);
-                control_input_unpack_tuple.push(quote!{#ctrl_unpack_tuple});
+                control_input_unpack_tuple.push(quote! {#ctrl_unpack_tuple});
 
                 // Push process model and transition to function args
                 const_generics.push(quote! { const #i_type: usize });
@@ -340,9 +370,11 @@ impl ChainGenerator {
                     #pm_ident: NonlinearProcessWithControlModel<#t_type, #i_type, #c_type, #s_type>
                 });
 
-                control_inputs_generics.push(quote!{ const #c_type: usize });
+                control_inputs_generics.push(quote! { const #c_type: usize });
 
-                control_input_params.push(quote! { &Vector<#t_type, Const<#c_type>, ArrayStorage<#t_type, #c_type, 1>> });
+                control_input_params.push(
+                    quote! { &Vector<#t_type, Const<#c_type>, ArrayStorage<#t_type, #c_type, 1>> },
+                );
 
                 process_function_body.push(quote! {
                 {
@@ -355,9 +387,8 @@ impl ChainGenerator {
                 }
                 });
             } else {
-                let types = extract_types_without_control(&model.generics).unwrap_or_else(|| {
-                    panic!("Expected at least 3 generics for the model!")
-                });
+                let types = extract_types_without_control(&model.generics)
+                    .unwrap_or_else(|| panic!("Expected at least 3 generics for the model!"));
 
                 let (t_type, i_type, s_type) = types;
 
@@ -387,18 +418,23 @@ impl ChainGenerator {
         let requires_control_input = self.process_models.iter().any(|model| model.has_control);
 
         let control_inputs = if requires_control_input {
-            Some(quote!{ control_inputs: (#(#control_input_params,)*), })
+            Some(quote! { control_inputs: (#(#control_input_params,)*), })
         } else {
             None
         };
 
         // Dynamically generate the type arguments for `predict` based on the number of models
-        let type_args = self.process_models.iter().enumerate().map(|(i, _)| {
-            let index = syn::Index::from(i + 1);
-            let pm_ident = format_ident!("PM{}", index);
-            let st_ident = format_ident!("ST{}", index);
-            quote! { #pm_ident, #st_ident }
-        }).collect::<Vec<_>>();
+        let type_args = self
+            .process_models
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                let index = syn::Index::from(i + 1);
+                let pm_ident = format_ident!("PM{}", index);
+                let st_ident = format_ident!("ST{}", index);
+                quote! { #pm_ident, #st_ident }
+            })
+            .collect::<Vec<_>>();
 
         // Generate the function signature and body
         let function_signature = quote! {
@@ -418,7 +454,7 @@ impl ChainGenerator {
         };
 
         let control_inputs_unpacking = if requires_control_input {
-            Some(quote!{ let (#(#control_input_unpack_tuple,)*) = control_inputs; })
+            Some(quote! { let (#(#control_input_unpack_tuple,)*) = control_inputs; })
         } else {
             None
         };
