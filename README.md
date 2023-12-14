@@ -13,3 +13,7 @@ library for Kalman Filters.
   the particular Kalman filter state space and overall measurement space
   this would allow us to have a library of different measurement and
   process models that could be used in different configurations.
+
+## Library Architecture
+
+![rudie2.0_architecture.png](diagrams/rudie2.0_architecture.png)
